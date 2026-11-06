@@ -103,3 +103,55 @@ configurados para TLS mútuo e autenticação com usuário e senha. Não exponha
 porta externamente sem rever a arquitetura, firewall e controles de rede.
 Esta configuração não fornece alta disponibilidade, monitoramento ou backup
 automatizado; esses controles devem ser planejados separadamente para produção.
+
+### Alternativa sem TLS
+
+A configuração [docker-compose-fast.yml](redis/docker-compose-fast.yml) usa
+o mesmo Redis e a mesma ACL, mas não usa TLS nem certificados de cliente. A
+autenticação e os dados trafegam **sem criptografia**, portanto qualquer pessoa
+com acesso ao tráfego ou à porta pode interceptá-los. Use apenas em um ambiente
+local confiável, não exponha a porta externamente e considere que outros
+contêineres na mesma rede também podem acessá-la. Para redes não confiáveis,
+use a configuração com TLS.
+
+A alternativa usa a porta local `6380` e o diretório `redis/data-fast/`
+separado; não compartilha nem migra automaticamente os dados de `redis/data/`.
+Para migrar, pare o serviço de origem, faça backup e copie uma imagem consistente
+de todos os seus arquivos para o novo diretório antes de iniciar. Ela mantém
+AOF e `appendfsync everysec`: remover o custo de TLS não elimina o custo de
+persistência nem garante um ganho específico. Meça a latência e a vazão com a
+carga real antes de decidir.
+
+Prepare `secrets/redis.acl` e `secrets/app.password` como descrito acima, caso
+ainda não existam. **Não execute novamente os comandos de geração de senha
+sobre credenciais existentes**, pois isso altera a senha e a ACL. A alternativa
+sem TLS não precisa dos arquivos de certificado.
+
+Para Podman rootless, em `redis/`:
+
+```sh
+mkdir -p data-fast
+podman unshare chown -R 999:999 data-fast
+podman unshare chmod 700 data-fast
+podman unshare chown 999:999 secrets/redis.acl
+podman unshare chmod 600 secrets/redis.acl
+podman compose -f docker-compose-fast.yml up -d --build
+podman compose -f docker-compose-fast.yml logs redis-fast
+```
+
+Em sistemas com SELinux, os volumes usam rótulos privado (`data-fast/`) e
+compartilhado (`redis.acl`), alterando os rótulos desses caminhos no host.
+Se o arquivo ACL for substituído, recrie o serviço com
+`podman compose -f docker-compose-fast.yml up -d --force-recreate`.
+
+Para testar a partir do host com `redis-cli`:
+
+```sh
+REDISCLI_AUTH="$(cat secrets/app.password)" redis-cli \
+  --user app -h 127.0.0.1 -p 6380 PING
+```
+
+O resultado esperado é `PONG`. Como referência, uma aplicação no mesmo host
+precisará de host `127.0.0.1`, porta `6380`, usuário `app`, a senha gerada e
+TLS desativado. Os nomes das variáveis de ambiente dependem do cliente Redis;
+aplicações em outros contêineres precisam de rede e endereço apropriados.

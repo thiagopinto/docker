@@ -1,0 +1,17 @@
+services:
+  redis-fast:
+    build: .
+    command: ["redis-server", "/usr/local/etc/redis/redis-fast.conf"]
+    restart: unless-stopped
+    user: "999:999"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - ./data-fast:/data:Z
+      - ./secrets/redis.acl:/run/redis-secrets/redis.acl:ro,z
