@@ -12,8 +12,5 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
-      - ./data:/data
-      - ./secrets/redis.acl:/run/redis-secrets/redis.acl:ro
-      - ./secrets/ca.crt:/run/redis-secrets/ca.crt:ro
-      - ./secrets/server.crt:/run/redis-secrets/server.crt:ro
-      - ./secrets/server.key:/run/redis-secrets/server.key:ro
+      - ./data:/data:Z
+      - ./secrets/redis.acl:/run/redis-secrets/redis.acl:ro,z
